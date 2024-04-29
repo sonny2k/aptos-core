@@ -54,12 +54,12 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
         .set_flavor("async");
     let known_attributes = attr_derivation::get_known_attributes_for_flavor(&flags);
     let env = run_model_builder_with_options_and_compilation_flags(
-        vec![PackagePaths {
+        &vec![PackagePaths {
             name: None,
             paths: sources,
             named_address_map: named_address_map.clone(),
         }],
-        vec![PackagePaths {
+        &vec![PackagePaths {
             name: None,
             paths: deps,
             named_address_map,
@@ -67,6 +67,7 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
         ModelBuilderOptions::default(),
         flags,
         &known_attributes,
+        None,
     )?;
     for exp in std::iter::once(String::new()).chain(experiments.into_iter()) {
         let mut options = Options {

@@ -25,7 +25,9 @@ use move_prover_bytecode_pipeline::{
     number_operation::GlobalNumberOperationState, pipeline_factory,
 };
 use move_stackless_bytecode::function_target_pipeline::FunctionTargetsHolder;
+use move_symbol_pool::Symbol;
 use std::{
+    collections::BTreeMap,
     fs,
     path::{Path, PathBuf},
     time::Instant,
@@ -48,12 +50,12 @@ pub fn run_move_prover<W: WriteColor>(
     let now = Instant::now();
     let addrs = parse_addresses_from_options(options.move_named_address_values.clone())?;
     let mut env = run_model_builder_with_options(
-        vec![PackagePaths {
+        &vec![PackagePaths {
             name: None,
             paths: options.move_sources.clone(),
             named_address_map: addrs.clone(),
         }],
-        vec![PackagePaths {
+        &vec![PackagePaths {
             name: None,
             paths: options.move_deps.clone(),
             named_address_map: addrs,
@@ -71,8 +73,27 @@ pub fn run_move_prover_v2<W: WriteColor>(
 ) -> anyhow::Result<()> {
     let now = Instant::now();
     let cloned_options = options.clone();
+    let deps_paths = vec![PackagePaths {
+        name: None,
+        paths: cloned_options
+            .move_deps
+            .iter()
+            .map(|s| Symbol::from(s.as_str()))
+            .collect(),
+        named_address_map: BTreeMap::new(),
+    }];
+    let move_sources_paths = vec![PackagePaths {
+        name: None,
+        paths: cloned_options
+            .move_sources
+            .iter()
+            .map(|s| Symbol::from(s.as_str()))
+            .collect(),
+        named_address_map: BTreeMap::new(),
+    }];
     let compiler_options = move_compiler_v2::Options {
-        dependencies: cloned_options.move_deps,
+        packages: move_sources_paths,
+        dependencies: deps_paths,
         named_address_mapping: cloned_options.move_named_address_values,
         output_dir: cloned_options.output_path,
         language_version: cloned_options.language_version,
@@ -81,7 +102,6 @@ pub fn run_move_prover_v2<W: WriteColor>(
         testing: cloned_options.backend.stable_test_output,
         experiments: vec![],
         experiment_cache: Default::default(),
-        sources: cloned_options.move_sources,
         warn_unused: false,
         whole_program: false,
         compile_test_code: false,

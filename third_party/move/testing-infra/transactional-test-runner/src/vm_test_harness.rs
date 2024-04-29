@@ -23,7 +23,10 @@ use move_command_line_common::{
 };
 use move_compiler::{
     compiled_unit::AnnotatedCompiledUnit,
-    shared::{known_attributes::KnownAttribute, Flags, PackagePaths},
+    shared::{
+        known_attributes::KnownAttribute, string_map_to_symbol_map, string_vec_to_symbol_vec,
+        Flags, NumericalAddress, PackagePaths,
+    },
     FullyCompiledProgram,
 };
 use move_core_types::{
@@ -35,7 +38,7 @@ use move_core_types::{
 };
 use move_model::metadata::LanguageVersion;
 use move_resource_viewer::MoveValueAnnotator;
-use move_stdlib::move_stdlib_named_addresses;
+use move_stdlib::{move_stdlib_files, move_stdlib_named_addresses};
 use move_symbol_pool::Symbol;
 use move_vm_runtime::{
     config::VMConfig,
@@ -430,7 +433,7 @@ static PRECOMPILED_MOVE_STDLIB: Lazy<Option<FullyCompiledProgram>> = Lazy::new(|
         return None;
     }
     let program_res = move_compiler::construct_pre_compiled_lib(
-        vec![PackagePaths {
+        &vec![PackagePaths {
             name: None,
             paths: move_stdlib::move_stdlib_files(),
             named_address_map: move_stdlib::move_stdlib_named_addresses(),
@@ -448,6 +451,14 @@ static PRECOMPILED_MOVE_STDLIB: Lazy<Option<FullyCompiledProgram>> = Lazy::new(|
         },
     }
 });
+
+pub fn move_stdlib_named_addresses_as_symbols() -> BTreeMap<Symbol, NumericalAddress> {
+    string_map_to_symbol_map(&move_stdlib_named_addresses())
+}
+
+pub fn move_stdlib_files_as_symbols() -> Vec<Symbol> {
+    string_vec_to_symbol_vec(&move_stdlib_files())
+}
 
 pub struct PrecompiledFilesModules(Vec<String>, Vec<AnnotatedCompiledUnit>);
 
@@ -467,7 +478,11 @@ impl PrecompiledFilesModules {
 
 static PRECOMPILED_MOVE_STDLIB_V2: Lazy<PrecompiledFilesModules> = Lazy::new(|| {
     let options = move_compiler_v2::Options {
-        sources: move_stdlib::move_stdlib_files(),
+        packages: vec![PackagePaths {
+            name: None,
+            paths: move_stdlib_files_as_symbols(),
+            named_address_map: move_stdlib_named_addresses_as_symbols(),
+        }],
         dependencies: vec![],
         named_address_mapping: move_stdlib::move_stdlib_named_addresses_strings(),
         known_attributes: KnownAttribute::get_all_attribute_names().clone(),

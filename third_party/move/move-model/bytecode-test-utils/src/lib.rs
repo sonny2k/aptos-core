@@ -5,7 +5,10 @@
 use anyhow::anyhow;
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
 use move_command_line_common::testing::EXP_EXT;
-use move_compiler::shared::{known_attributes::KnownAttribute, PackagePaths};
+use move_compiler::shared::{
+    known_attributes::KnownAttribute, string_map_to_symbol_map, string_vec_to_symbol_vec,
+    PackagePaths,
+};
 use move_compiler_v2::{self, env_pipeline::rewrite_target::RewritingScope, Experiment};
 use move_model::{model::GlobalEnv, options::ModelBuilderOptions, run_model_builder_with_options};
 use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
@@ -30,12 +33,12 @@ pub fn test_runner(
     let mut sources = extract_test_directives(path, "// dep:")?;
     sources.push(path.to_string_lossy().to_string());
     let mut env: GlobalEnv = run_model_builder_with_options(
-        vec![PackagePaths {
+        &vec![PackagePaths {
             name: None,
-            paths: sources,
-            named_address_map: move_stdlib::move_stdlib_named_addresses(),
+            paths: string_vec_to_symbol_vec(&sources),
+            named_address_map: string_map_to_symbol_map(&move_stdlib::move_stdlib_named_addresses()),
         }],
-        vec![],
+        &vec![],
         ModelBuilderOptions::default(),
         false,
         KnownAttribute::get_all_attribute_names(),

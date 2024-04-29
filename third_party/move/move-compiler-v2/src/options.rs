@@ -7,7 +7,7 @@ use clap::Parser;
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use move_command_line_common::env::read_env_var;
-use move_compiler::command_line as cli;
+use move_compiler::{command_line as cli, shared::PackagePaths};
 use move_model::metadata::LanguageVersion;
 use once_cell::sync::Lazy;
 use std::{
@@ -19,13 +19,10 @@ use std::{
 #[derive(Parser, Clone, Debug)]
 #[clap(author, version, about)]
 pub struct Options {
+    #[clap(skip)]
     /// Directories where to lookup dependencies.
-    #[clap(
-        short,
-        num_args = 0..
-    )]
-    pub dependencies: Vec<String>,
-    /// Named address mapping.
+    pub dependencies: Vec<PackagePaths>,
+    /// Added named address mapping.
     #[clap(
         short,
         num_args = 0..
@@ -59,8 +56,9 @@ pub struct Options {
     /// A transient cache for memoization of experiment checks.
     #[clap(skip)]
     pub experiment_cache: RefCell<BTreeMap<String, bool>>,
-    /// Sources to compile (positional arg, therefore last)
-    pub sources: Vec<String>,
+    /// Sources to compile
+    #[clap(skip)]
+    pub packages: Vec<PackagePaths>,
     /// Show warnings about unused functions, fields, constants, etc.
     /// Note that the current value of this constant is "Wunused"
     #[clap(long = cli::WARN_UNUSED_FLAG, default_value="false")]

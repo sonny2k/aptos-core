@@ -52,7 +52,7 @@ use move_compiler::{
 };
 use move_disassembler::disassembler::Disassembler;
 use move_ir_types::location;
-use move_model::{add_move_lang_diagnostics, model::GlobalEnv, PackageInfo};
+use move_model::{add_move_lang_diagnostics, model::GlobalEnv};
 use move_stackless_bytecode::function_target_pipeline::{
     FunctionTargetPipeline, FunctionTargetsHolder, FunctionVariant,
 };
@@ -93,10 +93,12 @@ where
     if log_enabled!(Level::Debug) {
         // Dump bytecode, providing a name for the target derived from the first input file.
         let dump_base_name = options
-            .sources
-            .first()
+            .packages
+            .iter()
+            .flat_map(|x| x.paths.iter())
+            .next()
             .and_then(|f| {
-                Path::new(f)
+                Path::new(f.as_str())
                     .file_name()
                     .map(|f| f.to_string_lossy().as_ref().to_owned())
             })
@@ -154,14 +156,9 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
     // Run the model builder, which performs context checking.
     let addrs = move_model::parse_addresses_from_options(options.named_address_mapping.clone())?;
     let mut env = move_model::run_model_builder_in_compiler_mode(
-        PackageInfo {
-            sources: options.sources.clone(),
-            address_map: addrs.clone(),
-        },
-        vec![PackageInfo {
-            sources: options.dependencies.clone(),
-            address_map: addrs.clone(),
-        }],
+        &options.packages,
+        &options.dependencies,
+        Some(&addrs),
         options.skip_attribute_checks,
         if !options.skip_attribute_checks && options.known_attributes.is_empty() {
             KnownAttribute::get_all_attribute_names()

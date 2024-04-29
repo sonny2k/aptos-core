@@ -444,7 +444,7 @@ impl CompiledPackage {
                 anyhow::format_err!(
                     "Unable to find module with name '{}' in package {}",
                     module_name,
-                    self.compiled_package_info.package_name
+                    self.compiled_package_info.package_name,
                 )
             })
     }
@@ -484,7 +484,7 @@ impl CompiledPackage {
                 anyhow::format_err!(
                     "Unable to find module with name '{}' in package {}",
                     module_name,
-                    self.compiled_package_info.package_name
+                    self.compiled_package_info.package_name,
                 )
             })
     }
@@ -638,60 +638,57 @@ impl CompiledPackage {
         let effective_language_version = config.language_version.unwrap_or_default();
         effective_compiler_version.check_language_support(effective_language_version)?;
 
-        let (file_map, all_compiled_units, optional_global_env) = match config
-            .compiler_version
-            .unwrap_or_default()
-        {
-            CompilerVersion::V1 => {
-                let compiler =
-                    Compiler::from_package_paths(paths, bytecode_deps, flags, &known_attributes);
-                compiler_driver_v1(compiler)?
-            },
-            CompilerVersion::V2_0 => {
-                let to_str_vec = |ps: &[Symbol]| {
-                    ps.iter()
-                        .map(move |s| s.as_str().to_owned())
-                        .collect::<Vec<_>>()
-                };
-                let mut global_address_map = BTreeMap::new();
-                for pack in paths.iter().chain(bytecode_deps.iter()) {
-                    for (name, val) in &pack.named_address_map {
-                        if let Some(old) = global_address_map.insert(name.as_str().to_owned(), *val)
-                        {
-                            if old != *val {
-                                let pack_name = pack
-                                    .name
-                                    .map(|s| s.as_str().to_owned())
-                                    .unwrap_or_else(|| "<unnamed>".to_owned());
-                                bail!(
+        let (file_map, all_compiled_units, optional_global_env) =
+            match config.compiler_version.unwrap_or_default() {
+                CompilerVersion::V1 => {
+                    let compiler = Compiler::from_package_paths(
+                        &paths,
+                        &bytecode_deps,
+                        flags,
+                        &known_attributes,
+                        None,
+                    );
+                    compiler_driver_v1(compiler)?
+                },
+                CompilerVersion::V2_0 => {
+                    let mut global_address_map = BTreeMap::new();
+                    for pack in paths.iter().chain(bytecode_deps.iter()) {
+                        for (name, val) in &pack.named_address_map {
+                            if let Some(old) =
+                                global_address_map.insert(name.as_str().to_owned(), *val)
+                            {
+                                if old != *val {
+                                    let pack_name = pack
+                                        .name
+                                        .map(|s| s.as_str().to_owned())
+                                        .unwrap_or_else(|| "<unnamed>".to_owned());
+                                    bail!(
                                     "found remapped address alias `{}` (`{} != {}`) in package `{}`\
                                     , please use unique address aliases across dependencies",
                                     name, old, val, pack_name
                                 )
+                                }
                             }
                         }
                     }
-                }
-                let mut options = move_compiler_v2::Options {
-                    sources: paths.iter().flat_map(|x| to_str_vec(&x.paths)).collect(),
-                    dependencies: bytecode_deps
-                        .iter()
-                        .flat_map(|x| to_str_vec(&x.paths))
-                        .collect(),
-                    named_address_mapping: global_address_map
-                        .into_iter()
-                        .map(|(k, v)| format!("{}={}", k, v))
-                        .collect(),
-                    skip_attribute_checks,
-                    known_attributes: known_attributes.clone(),
-                    language_version: Some(effective_language_version),
-                    compile_test_code: flags.keep_testing_functions(),
-                    ..Default::default()
-                };
-                options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
-                compiler_driver_v2(options)?
-            },
-        };
+
+                    let mut options = move_compiler_v2::Options {
+                        packages: paths,
+                        dependencies: bytecode_deps,
+                        named_address_mapping: global_address_map
+                            .into_iter()
+                            .map(|(k, v)| format!("{}={}", k, v))
+                            .collect(),
+                        skip_attribute_checks,
+                        known_attributes: known_attributes.clone(),
+                        language_version: Some(effective_language_version),
+                        compile_test_code: flags.keep_testing_functions(),
+                        ..Default::default()
+                    };
+                    options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
+                    compiler_driver_v2(options)?
+                },
+            };
         let mut root_compiled_units = vec![];
         let mut deps_compiled_units = vec![];
         let obtain_package_name =
@@ -748,21 +745,19 @@ impl CompiledPackage {
             if skip_attribute_checks {
                 flags = flags.set_skip_attribute_checks(true)
             }
-
-            let model = match (
-                resolution_graph.build_options.generate_docs,
-                resolution_graph.build_options.generate_abis,
-                optional_global_env,
-            ) {
-                (false, false, Some(env)) => env, // Use V2 generated model if not for docgen or abigen
-                _ => run_model_builder_with_options_and_compilation_flags(
-                    // Otherwise, use V1 generated model
-                    vec![sources_package_paths],
-                    deps_package_paths.into_iter().map(|(p, _)| p).collect_vec(),
+            let model = if let Some(env) = optional_global_env {
+                // Use V2 generated model if we have one
+                env
+            } else {
+                // Otherwise, use V1 generated model
+                run_model_builder_with_options_and_compilation_flags(
+                    &vec![sources_package_paths],
+                    &deps_package_paths.into_iter().map(|(p, _)| p).collect_vec(),
                     ModelBuilderOptions::default(),
                     flags,
                     &known_attributes,
-                )?,
+                    None,
+                )?
             };
 
             if resolution_graph.build_options.generate_docs {

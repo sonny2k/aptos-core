@@ -6,6 +6,7 @@ use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
 use datatest_stable::Requirements;
 use itertools::Itertools;
 use log::debug;
+use move_compiler::shared::{string_vec_to_symbol_vec, PackagePaths};
 use move_compiler_v2::{
     annotate_units, disassemble_compiled_units, env_pipeline::rewrite_target::RewritingScope,
     logging, pipeline, plan_builder, run_bytecode_verifier, run_file_format_gen, Experiment,
@@ -558,10 +559,25 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
     let path_str = path.display().to_string();
     let mut options = config.options.clone();
     options.warn_unused = path_str.contains("/unused/");
-    options.sources = extract_test_directives(path, "// dep:")?;
-    options.sources.push(path_str.clone());
+    let raw_sources = extract_test_directives(path, "// dep:")?;
+    options.packages = vec![
+        PackagePaths {
+            name: Some("unit_test".into()),
+            paths: string_vec_to_symbol_vec(&vec![path_str.clone()]),
+            named_address_map: BTreeMap::new(),
+        },
+        PackagePaths {
+            name: Some("unit_test".into()),
+            paths: string_vec_to_symbol_vec(&raw_sources),
+            named_address_map: BTreeMap::new(),
+        },
+    ];
     options.dependencies = if extract_test_directives(path, "// no-stdlib")?.is_empty() {
-        vec![path_from_crate_root("../move-stdlib/sources")]
+        vec![PackagePaths {
+            name: Some("std".into()),
+            paths: string_vec_to_symbol_vec(&vec![path_from_crate_root("../move-stdlib/sources")]),
+            named_address_map: BTreeMap::new(),
+        }]
     } else {
         vec![]
     };

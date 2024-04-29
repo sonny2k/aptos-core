@@ -5,7 +5,11 @@ use super::reroot_path;
 use clap::*;
 use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
 use move_disassembler::disassembler::Disassembler;
-use move_package::{compilation::compiled_package::CompiledUnitWithSource, BuildConfig};
+use move_model::ast::ModuleName;
+use move_package::{
+    compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource},
+    BuildConfig,
+};
 use std::path::PathBuf;
 
 /// Disassemble the Move bytecode pointed to
@@ -24,6 +28,36 @@ pub struct Disassemble {
 }
 
 impl Disassemble {
+    fn package_module_summary(package: &CompiledPackage) -> String {
+        format!(
+            "<package: `{}`, modules: `{}`, dep_modules: `{}`",
+            package.compiled_package_info.package_name.as_str(),
+            package
+                .root_compiled_units
+                .iter()
+                .map(|unit| unit.unit.name().as_str().to_string())
+                .collect::<Vec<_>>()
+                .join(", "),
+            Self::package_dep_module_summary(package)
+        )
+        .to_string()
+    }
+
+    fn package_dep_module_summary(package: &CompiledPackage) -> String {
+        package
+            .deps_compiled_units
+            .iter()
+            .map(|(dep_package, unit)| {
+                format!(
+                    "<package: `{}`, module: `{}`>",
+                    dep_package.as_str(),
+                    unit.unit.name().as_str()
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+
     pub fn execute(self, path: Option<PathBuf>, config: BuildConfig) -> anyhow::Result<()> {
         let rerooted_path = reroot_path(path)?;
         let Self {
@@ -39,12 +73,15 @@ impl Disassemble {
         match package
             .get_module_by_name(needle_package, &module_or_script_name)
             .or_else(|_| package.get_script_by_name(needle_package, &module_or_script_name))
+        // If we can't find the module directly, check for a mangled script name
+            .or_else(|_| package.get_script_by_name(needle_package, ModuleName::pseudo_script_name_builder(&module_or_script_name, 0).as_str()))
             .ok()
         {
             None => anyhow::bail!(
-                "Unable to find module or script with name '{}' in package '{}'",
+                "Unable to find module or script with name '{}' in package '{}', found modules/scripts `{}`",
                 module_or_script_name,
                 needle_package,
+                Self::package_module_summary(&package)
             ),
             Some(unit) => {
                 // Once we find the compiled bytecode we're interested in, startup the bytecode

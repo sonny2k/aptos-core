@@ -3,21 +3,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
-use move_command_line_common::testing::EXP_EXT;
-use move_compiler::shared::{known_attributes::KnownAttribute, PackagePaths};
+use move_command_line_common::{address::NumericalAddress, testing::EXP_EXT};
+use move_compiler::shared::{
+    known_attributes::KnownAttribute, string_vec_to_symbol_vec, PackagePaths,
+};
 use move_model::{options::ModelBuilderOptions, run_model_builder_with_options};
 use move_prover_test_utils::baseline_test::verify_or_update_baseline;
-use std::path::Path;
+use move_symbol_pool::Symbol;
+use std::{collections::BTreeMap, path::Path};
 
 fn test_runner(path: &Path, options: ModelBuilderOptions) -> datatest_stable::Result<()> {
     let targets = vec![PackagePaths {
         name: None,
-        paths: vec![path.to_str().unwrap().to_string()],
-        named_address_map: std::collections::BTreeMap::<String, _>::new(),
+        paths: string_vec_to_symbol_vec(&vec![path.to_str().unwrap().to_string()]),
+        named_address_map: BTreeMap::<Symbol, NumericalAddress>::new(),
     }];
     let env = run_model_builder_with_options(
-        targets,
-        vec![],
+        &targets,
+        &vec![],
         options,
         false,
         KnownAttribute::get_all_attribute_names(),

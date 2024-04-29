@@ -23,6 +23,7 @@ use move_command_line_common::files::{
 use move_core_types::language_storage::ModuleId as CompiledModuleId;
 use move_symbol_pool::Symbol;
 use std::{
+    clone::Clone,
     collections::{BTreeMap, BTreeSet},
     fs,
     fs::File,
@@ -94,40 +95,52 @@ pub struct FullyCompiledProgram {
 //**************************************************************************************************
 
 impl<'a> Compiler<'a> {
-    pub fn from_package_paths<Paths: Into<Symbol>, NamedAddress: Into<Symbol>>(
-        targets: Vec<PackagePaths<Paths, NamedAddress>>,
-        deps: Vec<PackagePaths<Paths, NamedAddress>>,
+    fn indexed_scopes<Paths: Into<Symbol> + Clone, NamedAddress: Into<Symbol> + Clone>(
+        maps: &mut NamedAddressMaps,
+        all_pkgs: &Vec<PackagePaths<Paths, NamedAddress>>,
+        extra_addrs: Option<&BTreeMap<String, NumericalAddress>>,
+    ) -> Vec<IndexedPackagePath> {
+        let mut idx_paths = vec![];
+        for PackagePaths {
+            name,
+            paths,
+            named_address_map,
+        } in all_pkgs
+        {
+            let named_address_map_iter = named_address_map
+                .into_iter()
+                .map(|(k, v)| ((k.clone()).into(), *v));
+            let collected = if let Some(extra_addrs) = extra_addrs {
+                named_address_map_iter
+                    .chain(
+                        extra_addrs
+                            .into_iter()
+                            .map(|(k, v)| (Symbol::from(k.as_str()), *v)),
+                    )
+                    .collect::<NamedAddressMap>()
+            } else {
+                named_address_map_iter.collect::<NamedAddressMap>()
+            };
+            let idx = maps.insert(collected);
+            idx_paths.extend(paths.into_iter().map(|path| IndexedPackagePath {
+                package: *name,
+                path: (path.clone()).into(),
+                named_address_map: idx,
+            }))
+        }
+        idx_paths
+    }
+
+    pub fn from_package_paths<Paths: Into<Symbol> + Clone, NamedAddress: Into<Symbol> + Clone>(
+        targets: &Vec<PackagePaths<Paths, NamedAddress>>,
+        deps: &Vec<PackagePaths<Paths, NamedAddress>>,
         flags: Flags,
         known_attributes: &BTreeSet<String>,
+        extra_addrs: Option<&BTreeMap<String, NumericalAddress>>,
     ) -> Self {
-        fn indexed_scopes(
-            maps: &mut NamedAddressMaps,
-            all_pkgs: Vec<PackagePaths<impl Into<Symbol>, impl Into<Symbol>>>,
-        ) -> Vec<IndexedPackagePath> {
-            let mut idx_paths = vec![];
-            for PackagePaths {
-                name,
-                paths,
-                named_address_map,
-            } in all_pkgs
-            {
-                let idx = maps.insert(
-                    named_address_map
-                        .into_iter()
-                        .map(|(k, v)| (k.into(), v))
-                        .collect::<NamedAddressMap>(),
-                );
-                idx_paths.extend(paths.into_iter().map(|path| IndexedPackagePath {
-                    package: name,
-                    path: path.into(),
-                    named_address_map: idx,
-                }))
-            }
-            idx_paths
-        }
         let mut maps = NamedAddressMaps::new();
-        let targets = indexed_scopes(&mut maps, targets);
-        let deps = indexed_scopes(&mut maps, deps);
+        let targets = Self::indexed_scopes(&mut maps, targets, extra_addrs);
+        let deps = Self::indexed_scopes(&mut maps, deps, extra_addrs);
 
         Self {
             maps,
@@ -141,7 +154,7 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    pub fn from_files<Paths: Into<Symbol>, NamedAddress: Into<Symbol> + Clone>(
+    pub fn from_files<Paths: Into<Symbol> + Clone, NamedAddress: Into<Symbol> + Clone>(
         targets: Vec<Paths>,
         deps: Vec<Paths>,
         named_address_map: BTreeMap<NamedAddress, NumericalAddress>,
@@ -158,7 +171,7 @@ impl<'a> Compiler<'a> {
             paths: deps,
             named_address_map,
         }];
-        Self::from_package_paths(targets, deps, flags, known_attributes)
+        Self::from_package_paths(&targets, &deps, flags, known_attributes, None)
     }
 
     pub fn set_interface_files_dir(mut self, dir: String) -> Self {
@@ -427,20 +440,20 @@ impl<'a> SteppedCompiler<'a, PASS_COMPILATION> {
 
 /// Given a set of dependencies, precompile them and save the ASTs so that they can be used again
 /// to compile against without having to recompile these dependencies
-pub fn construct_pre_compiled_lib<Paths: Into<Symbol>, NamedAddress: Into<Symbol>>(
-    targets: Vec<PackagePaths<Paths, NamedAddress>>,
+pub fn construct_pre_compiled_lib<
+    Paths: Into<Symbol> + Clone,
+    NamedAddress: Into<Symbol> + Clone,
+>(
+    targets: &Vec<PackagePaths<Paths, NamedAddress>>,
     interface_files_dir_opt: Option<String>,
     flags: Flags,
     known_attributes: &BTreeSet<String>,
 ) -> anyhow::Result<Result<FullyCompiledProgram, (FilesSourceText, Diagnostics)>> {
-    let (files, pprog_and_comments_res) = Compiler::from_package_paths(
-        targets,
-        Vec::<PackagePaths<Paths, NamedAddress>>::new(),
-        flags,
-        known_attributes,
-    )
-    .set_interface_files_dir_opt(interface_files_dir_opt)
-    .run::<PASS_PARSER>()?;
+    let no_deps = Vec::<PackagePaths<Paths, NamedAddress>>::new();
+    let (files, pprog_and_comments_res) =
+        Compiler::from_package_paths(targets, &no_deps, flags, known_attributes, None)
+            .set_interface_files_dir_opt(interface_files_dir_opt)
+            .run::<PASS_PARSER>()?;
 
     let (_comments, stepped) = match pprog_and_comments_res {
         Err(errors) => return Ok(Err((files, errors))),

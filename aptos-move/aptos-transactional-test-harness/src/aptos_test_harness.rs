@@ -35,7 +35,11 @@ use move_command_line_common::{
     env::{get_move_compiler_block_v1_from_env, get_move_compiler_v2_from_env},
     files::verify_and_create_named_address_mapping,
 };
-use move_compiler::{self, shared::PackagePaths, FullyCompiledProgram};
+use move_compiler::{
+    self,
+    shared::{string_map_to_symbol_map, string_vec_to_symbol_vec, PackagePaths},
+    FullyCompiledProgram,
+};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
@@ -301,7 +305,7 @@ static PRECOMPILED_APTOS_FRAMEWORK_V1: Lazy<Option<FullyCompiledProgram>> = Lazy
         named_address_map: aptos_framework::named_addresses().clone(),
     }];
     let program_res = move_compiler::construct_pre_compiled_lib(
-        deps,
+        &deps,
         None,
         move_compiler::Flags::empty().set_sources_shadow_deps(false),
         aptos_framework::extended_checks::get_all_attribute_names(),
@@ -328,10 +332,17 @@ static PRECOMPILED_APTOS_FRAMEWORK_V2: Lazy<PrecompiledFilesModules> = Lazy::new
         .map(|(string, num_addr)| format!("{}={}", string, num_addr))
         .collect();
 
+    let source_packages = vec![PackagePaths {
+        name: None,
+        paths: string_vec_to_symbol_vec(
+            &aptos_cached_packages::head_release_bundle()
+                .files()
+                .unwrap(),
+        ),
+        named_address_map: string_map_to_symbol_map(&aptos_framework::named_addresses()),
+    }];
     let options = move_compiler_v2::Options {
-        sources: aptos_cached_packages::head_release_bundle()
-            .files()
-            .unwrap(),
+        packages: source_packages,
         dependencies: vec![],
         named_address_mapping: named_address_mapping_strings,
         known_attributes: aptos_framework::extended_checks::get_all_attribute_names().clone(),
