@@ -108,13 +108,13 @@ impl<'a> Compiler<'a> {
         } in all_pkgs
         {
             let named_address_map_iter = named_address_map
-                .into_iter()
+                .iter()
                 .map(|(k, v)| ((k.clone()).into(), *v));
             let collected = if let Some(extra_addrs) = extra_addrs {
                 named_address_map_iter
                     .chain(
                         extra_addrs
-                            .into_iter()
+                            .iter()
                             .map(|(k, v)| (Symbol::from(k.as_str()), *v)),
                     )
                     .collect::<NamedAddressMap>()
@@ -122,7 +122,7 @@ impl<'a> Compiler<'a> {
                 named_address_map_iter.collect::<NamedAddressMap>()
             };
             let idx = maps.insert(collected);
-            idx_paths.extend(paths.into_iter().map(|path| IndexedPackagePath {
+            idx_paths.extend(paths.iter().map(|path| IndexedPackagePath {
                 package: *name,
                 path: (path.clone()).into(),
                 named_address_map: idx,
