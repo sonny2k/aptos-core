@@ -320,8 +320,9 @@ impl TestHarness {
 
         // Handle outgoing message
         match network_req {
-            PeerManagerRequest::SendDirectSend(remote_peer_id, msg) => {
-                let mempool_message = common::decompress_and_deserialize(&msg.mdata.to_vec());
+            PeerManagerRequest::SendDirectSend(remote_peer_id, message_with_metadata) => {
+                let message = message_with_metadata.get_message();
+                let mempool_message = common::decompress_and_deserialize(&message.mdata.to_vec());
                 match mempool_message {
                     MempoolSyncMsg::BroadcastTransactionsRequest {
                         transactions,
@@ -366,7 +367,7 @@ impl TestHarness {
                         receiver.send_network_req(
                             network_id,
                             ProtocolId::MempoolDirectSend,
-                            PeerManagerNotification::RecvMessage(sender_peer_id, msg),
+                            PeerManagerNotification::RecvMessage(sender_peer_id, message.clone()),
                         );
                         receiver.wait_for_event(SharedMempoolNotification::NewTransactions);
 
@@ -412,8 +413,9 @@ impl TestHarness {
         let network_req = sender.get_next_network_req(network_id);
 
         match network_req {
-            PeerManagerRequest::SendDirectSend(remote_peer_id, msg) => {
-                let mempool_message = common::decompress_and_deserialize(&msg.mdata.to_vec());
+            PeerManagerRequest::SendDirectSend(remote_peer_id, message_with_metadata) => {
+                let message = message_with_metadata.get_message();
+                let mempool_message = common::decompress_and_deserialize(&message.mdata.to_vec());
                 match mempool_message {
                     MempoolSyncMsg::BroadcastTransactionsResponse { .. } => {
                         // send it to peer
@@ -435,7 +437,7 @@ impl TestHarness {
                         receiver.send_network_req(
                             network_id,
                             ProtocolId::MempoolDirectSend,
-                            PeerManagerNotification::RecvMessage(sender_peer_id, msg),
+                            PeerManagerNotification::RecvMessage(sender_peer_id, message.clone()),
                         );
                     },
                     request => panic!(

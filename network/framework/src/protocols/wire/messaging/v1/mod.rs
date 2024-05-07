@@ -10,7 +10,10 @@
 //! describes in greater detail how these messages are sent and received
 //! over-the-wire.
 
-use crate::protocols::{stream::StreamMessage, wire::handshake::v1::ProtocolId};
+use crate::{
+    peer_manager::MessageLatencyMetadata,
+    protocols::{stream::StreamMessage, wire::handshake::v1::ProtocolId},
+};
 use bytes::Bytes;
 use futures::{
     io::{AsyncRead, AsyncWrite},
@@ -52,6 +55,32 @@ pub enum MultiplexMessage {
     Stream(StreamMessage),
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MultiplexMessageWithMetadata {
+    message: MultiplexMessage,
+    latency_metadata: MessageLatencyMetadata,
+}
+
+impl MultiplexMessageWithMetadata {
+    /// Creates a new multiplex message with the specified metadata
+    pub fn new(message: MultiplexMessage, latency_metadata: MessageLatencyMetadata) -> Self {
+        Self {
+            message,
+            latency_metadata,
+        }
+    }
+
+    /// Returns a reference to the message
+    pub fn get_message(&self) -> &MultiplexMessage {
+        &self.message
+    }
+
+    /// Returns the message latency metadata
+    pub fn get_latency_metadata(&self) -> MessageLatencyMetadata {
+        self.latency_metadata
+    }
+}
+
 impl NetworkMessage {
     /// The size of the raw data excluding the headers
     pub fn data_len(&self) -> usize {
@@ -61,6 +90,39 @@ impl NetworkMessage {
             NetworkMessage::RpcResponse(response) => response.raw_response.len(),
             NetworkMessage::DirectSendMsg(message) => message.raw_msg.len(),
         }
+    }
+}
+
+/// A wrapper around network messages that hold metadata
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NetworkMessageWithMetadata {
+    network_message: NetworkMessage,
+    latency_metadata: MessageLatencyMetadata,
+}
+
+impl NetworkMessageWithMetadata {
+    /// Creates a new network message with the given metadata
+    pub fn new_with_metadata(
+        network_message: NetworkMessage,
+        latency_metadata: MessageLatencyMetadata,
+    ) -> Self {
+        Self {
+            network_message,
+            latency_metadata,
+        }
+    }
+
+    /// Creates a new network message with empty metadata
+    pub fn new_with_empty_metadata(network_message: NetworkMessage) -> Self {
+        Self {
+            network_message,
+            latency_metadata: MessageLatencyMetadata::new_empty(),
+        }
+    }
+
+    /// Consumes and splits the message into its parts
+    pub fn into_parts(self) -> (NetworkMessage, MessageLatencyMetadata) {
+        (self.network_message, self.latency_metadata)
     }
 }
 

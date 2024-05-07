@@ -290,9 +290,10 @@ impl MempoolNode {
             protocol_id.from_bytes(&response).unwrap()
         } else {
             match self.get_outbound_handle(network_id).next().await.unwrap() {
-                PeerManagerRequest::SendDirectSend(peer_id, msg) => {
+                PeerManagerRequest::SendDirectSend(peer_id, message_with_metadata) => {
                     assert_eq!(peer_id, remote_peer_id);
-                    msg.protocol_id.from_bytes(&msg.mdata).unwrap()
+                    let message = message_with_metadata.get_message();
+                    message.protocol_id.from_bytes(&message.mdata).unwrap()
                 },
                 _ => panic!("Should not be getting an RPC response"),
             }
@@ -356,8 +357,9 @@ impl MempoolNode {
             PeerManagerRequest::SendRpc(peer_id, msg) => {
                 (peer_id, msg.protocol_id, msg.data, Some(msg.res_tx))
             },
-            PeerManagerRequest::SendDirectSend(peer_id, msg) => {
-                (peer_id, msg.protocol_id, msg.mdata, None)
+            PeerManagerRequest::SendDirectSend(peer_id, message_with_metadata) => {
+                let message = message_with_metadata.get_message();
+                (peer_id, message.protocol_id, message.mdata.clone(), None)
             },
         };
         assert_eq!(peer_id, expected_peer_id);

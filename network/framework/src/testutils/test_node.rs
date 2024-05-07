@@ -296,8 +296,9 @@ pub trait TestNode: ApplicationNode + Sync {
                 drop(res_tx);
                 (peer_id, protocol_id, data)
             },
-            PeerManagerRequest::SendDirectSend(peer_id, message) => {
-                (peer_id, message.protocol_id, message.mdata)
+            PeerManagerRequest::SendDirectSend(peer_id, message_with_metadata) => {
+                let message = message_with_metadata.get_message();
+                (peer_id, message.protocol_id, message.mdata.clone())
             },
         }
     }
@@ -313,8 +314,9 @@ pub trait TestNode: ApplicationNode + Sync {
                 msg.data,
                 Some((msg.timeout, msg.res_tx)),
             ),
-            PeerManagerRequest::SendDirectSend(peer_id, msg) => {
-                (peer_id, msg.protocol_id, msg.mdata, None)
+            PeerManagerRequest::SendDirectSend(peer_id, message_with_metadata) => {
+                let message = message_with_metadata.get_message();
+                (peer_id, message.protocol_id, message.clone().mdata, None)
             },
         };
 

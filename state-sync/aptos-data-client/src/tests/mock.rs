@@ -247,7 +247,9 @@ impl MockNetwork {
                     response_sender,
                 })
             },
-            Some(PeerManagerRequest::SendDirectSend(_, _)) => panic!("Unexpected direct send msg"),
+            Some(PeerManagerRequest::SendDirectSend(_, _)) => {
+                panic!("Unexpected direct send msg")
+            },
             None => None,
         }
     }

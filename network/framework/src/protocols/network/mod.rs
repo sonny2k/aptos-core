@@ -7,7 +7,10 @@
 pub use crate::protocols::rpc::error::RpcError;
 use crate::{
     error::NetworkError,
-    peer_manager::{ConnectionRequestSender, PeerManagerNotification, PeerManagerRequestSender},
+    peer_manager::{
+        ConnectionRequestSender, MessageLatencyMetadata, PeerManagerNotification,
+        PeerManagerRequestSender,
+    },
     ProtocolId,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -332,8 +335,17 @@ impl<TMessage: Message + Send + 'static> NetworkSender<TMessage> {
         protocol: ProtocolId,
         message: TMessage,
     ) -> Result<(), NetworkError> {
-        let mdata = protocol.to_bytes(&message)?.into();
-        self.peer_mgr_reqs_tx.send_to(recipient, protocol, mdata)?;
+        // Create latency metadata for the message
+        let mut latency_metadata = MessageLatencyMetadata::new_empty();
+        latency_metadata.set_serialization_start_time();
+
+        // Serialize the message and update the latency metadata
+        let message_bytes = protocol.to_bytes(&message)?.into();
+        latency_metadata.set_dispatch_start_time();
+
+        // Send the message to the peer manager
+        self.peer_mgr_reqs_tx
+            .send_to(recipient, protocol, message_bytes, latency_metadata)?;
         Ok(())
     }
 
@@ -345,10 +357,21 @@ impl<TMessage: Message + Send + 'static> NetworkSender<TMessage> {
         protocol: ProtocolId,
         message: TMessage,
     ) -> Result<(), NetworkError> {
-        // Serialize message.
-        let mdata = protocol.to_bytes(&message)?.into();
-        self.peer_mgr_reqs_tx
-            .send_to_many(recipients, protocol, mdata)?;
+        // Create latency metadata for the message
+        let mut latency_metadata = MessageLatencyMetadata::new_empty();
+        latency_metadata.set_serialization_start_time();
+
+        // Serialize the message and update the latency metadata
+        let message_bytes = protocol.to_bytes(&message)?.into();
+        latency_metadata.set_dispatch_start_time();
+
+        // Send the message to the peer manager
+        self.peer_mgr_reqs_tx.send_to_many(
+            recipients,
+            protocol,
+            message_bytes,
+            latency_metadata,
+        )?;
         Ok(())
     }
 
