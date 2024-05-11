@@ -15,8 +15,8 @@ use aptos_types::{
     account_address::AccountAddress,
     epoch_state::EpochState,
     jwks::{
-        jwk::JWKMoveStruct, AllProvidersJWKs, Issuer, ObservedJWKs, ObservedJWKsUpdated,
-        ProviderJWKs, QuorumCertifiedUpdate, SupportedOIDCProviders,
+        jwk::JWKMoveStruct, AllProvidersJWKs, Issuer, OIDCProvider, ObservedJWKs,
+        ObservedJWKsUpdated, ProviderJWKs, QuorumCertifiedUpdate, SupportedOIDCProviders,
     },
     validator_txn::{Topic, ValidatorTransaction},
 };
@@ -31,7 +31,6 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use aptos_types::jwks::OIDCProvider;
 
 /// `JWKManager` executes per-issuer JWK consensus sessions
 /// and updates validator txn pool with quorum-certified JWK updates.
@@ -109,20 +108,21 @@ impl JWKManager {
                 let maybe_issuer = String::from_utf8(name);
                 let maybe_config_url = String::from_utf8(config_url);
                 match (maybe_issuer, maybe_config_url) {
-                    (Ok(issuer), Ok(config_url)) => {
-                        Some(JWKObserver::spawn(
-                            self.epoch_state.epoch,
-                            self.my_addr,
-                            issuer,
-                            config_url,
-                            Duration::from_secs(10),
-                            local_observation_tx.clone(),
-                        ))
-                    }
-                    (maybe_issuer  @ _, maybe_config_url  @ _) => {
-                        warn!("unable to spawn observer, issuer={:?}, config_url={:?}", maybe_issuer, maybe_config_url);
+                    (Ok(issuer), Ok(config_url)) => Some(JWKObserver::spawn(
+                        self.epoch_state.epoch,
+                        self.my_addr,
+                        issuer,
+                        config_url,
+                        Duration::from_secs(10),
+                        local_observation_tx.clone(),
+                    )),
+                    (maybe_issuer, maybe_config_url) => {
+                        warn!(
+                            "unable to spawn observer, issuer={:?}, config_url={:?}",
+                            maybe_issuer, maybe_config_url
+                        );
                         None
-                    }
+                    },
                 }
             })
             .collect();

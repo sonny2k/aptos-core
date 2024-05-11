@@ -4,14 +4,13 @@
 use crate::counters::OBSERVATION_SECONDS;
 use anyhow::{anyhow, Result};
 use aptos_channels::aptos_channel;
+use aptos_jwk_utils::{fetch_jwks_from_jwks_uri, fetch_jwks_uri_from_openid_config};
 use aptos_logger::{debug, info};
-use aptos_types::jwks::{Issuer, jwk::JWK};
+use aptos_types::jwks::{jwk::JWK, Issuer};
 use futures::{FutureExt, StreamExt};
 use move_core_types::account_address::AccountAddress;
-use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 use tokio::{sync::oneshot, task::JoinHandle, time::MissedTickBehavior};
-use aptos_jwk_utils::{fetch_jwks_from_jwks_uri, fetch_jwks_uri_from_openid_config};
 
 /// A process thread that periodically fetch JWKs of a provider and push it back to JWKManager.
 pub struct JWKObserver {
@@ -99,7 +98,11 @@ impl JWKObserver {
 }
 
 async fn fetch_jwks(open_id_config_url: &str, my_addr: Option<AccountAddress>) -> Result<Vec<JWK>> {
-    let jwks_uri = fetch_jwks_uri_from_openid_config(open_id_config_url).await.map_err(|e|anyhow!("fetch_jwks failed with open-id config request: {e}"))?;
-    let jwks = fetch_jwks_from_jwks_uri(my_addr, jwks_uri.as_str()).await.map_err(|e|anyhow!("fetch_jwks failed with jwks uri request: {e}"))?;
+    let jwks_uri = fetch_jwks_uri_from_openid_config(open_id_config_url)
+        .await
+        .map_err(|e| anyhow!("fetch_jwks failed with open-id config request: {e}"))?;
+    let jwks = fetch_jwks_from_jwks_uri(my_addr, jwks_uri.as_str())
+        .await
+        .map_err(|e| anyhow!("fetch_jwks failed with jwks uri request: {e}"))?;
     Ok(jwks)
 }

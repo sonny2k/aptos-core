@@ -57,15 +57,29 @@ async fn jwk_consensus_basic() {
     assert!(patched_jwks.jwks.entries.len() == 1);
 
     info!("Adding some providers.");
-    let (alice_config_server, alice_jwks_server, bob_config_server, bob_jwks_server) =
-        tokio::join!(DummyHttpServer::spawn(), DummyHttpServer::spawn(), DummyHttpServer::spawn(), DummyHttpServer::spawn());
+    let (alice_config_server, alice_jwks_server, bob_config_server, bob_jwks_server) = tokio::join!(
+        DummyHttpServer::spawn(),
+        DummyHttpServer::spawn(),
+        DummyHttpServer::spawn(),
+        DummyHttpServer::spawn()
+    );
     let alice_issuer_id = "https://alice.io";
     let bob_issuer_id = "https://bob.dev";
     alice_config_server.update_request_handler(Some(Arc::new(StaticContentServer::new_str(
-        format!(r#"{{"issuer": "{}", "jwks_uri": "{}"}}"#, alice_issuer_id, alice_jwks_server.url()).as_str()
+        format!(
+            r#"{{"issuer": "{}", "jwks_uri": "{}"}}"#,
+            alice_issuer_id,
+            alice_jwks_server.url()
+        )
+        .as_str(),
     ))));
     bob_config_server.update_request_handler(Some(Arc::new(StaticContentServer::new_str(
-        format!(r#"{{"issuer": "{}", "jwks_uri": "{}"}}"#, bob_issuer_id, bob_jwks_server.url()).as_str()
+        format!(
+            r#"{{"issuer": "{}", "jwks_uri": "{}"}}"#,
+            bob_issuer_id,
+            bob_jwks_server.url()
+        )
+        .as_str(),
     ))));
 
     alice_jwks_server.update_request_handler(Some(Arc::new(StaticContentServer::new_str(
@@ -174,5 +188,10 @@ async fn jwk_consensus_basic() {
     );
 
     info!("Tear down.");
-    tokio::join!(alice_jwks_server.shutdown(), alice_config_server.shutdown(), bob_jwks_server.shutdown(), bob_config_server.shutdown());
+    tokio::join!(
+        alice_jwks_server.shutdown(),
+        alice_config_server.shutdown(),
+        bob_jwks_server.shutdown(),
+        bob_config_server.shutdown()
+    );
 }
