@@ -1201,7 +1201,9 @@ impl AptosVM {
         new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        if self.is_simulation {
+        // Once `multisig_v2_fix` is enabled, we use `execute_multisig_transaction` for simulation,
+        // deprecating `simulate_multisig_transaction`.
+        if self.is_simulation && !self.features().is_multisig_v2_fix_enabled() {
             self.simulate_multisig_transaction(
                 resolver,
                 session,
