@@ -148,7 +148,7 @@ impl<'a> ExtendedChecker<'a> {
                 if !ok {
                     self.env.error(
                         &fun.get_id_loc(),
-                        "`init_module` function can only take signers as parameters",
+                        "`init_module` function can only take `signer` values and immutable references as parameters",
                     );
                 }
             }
@@ -177,7 +177,7 @@ impl<'a> ExtendedChecker<'a> {
                 continue;
             }
 
-            self.check_transaction_args(&fun.get_id_loc(), &fun.get_parameter_types());
+            self.check_transaction_args(&fun.get_id_loc(), &fun.get_parameters());
             if fun.get_return_count() > 0 {
                 self.env
                     .error(&fun.get_id_loc(), "entry function cannot return values")
@@ -185,9 +185,9 @@ impl<'a> ExtendedChecker<'a> {
         }
     }
 
-    fn check_transaction_args(&self, loc: &Loc, arg_tys: &[Type]) {
-        for ty in arg_tys {
-            self.check_transaction_input_type(loc, ty)
+    fn check_transaction_args(&self, _loc: &Loc, arg_tys: &[Parameter]) {
+        for Parameter(_sym, ty, param_loc) in arg_tys {
+            self.check_transaction_input_type(param_loc, ty)
         }
     }
 
@@ -214,7 +214,7 @@ impl<'a> ExtendedChecker<'a> {
                 self.env.error(
                     loc,
                     &format!(
-                        "type `{}` is not supported as a parameter type",
+                        "type `{}` is not supported as an transaction parameter type",
                         ty.display(&self.env.get_type_display_ctx())
                     ),
                 );
@@ -560,35 +560,39 @@ impl<'a> ExtendedChecker<'a> {
             if !self.has_attribute(fun, VIEW_FUN_ATTRIBUTE) {
                 continue;
             }
-            self.check_transaction_args(&fun.get_id_loc(), &fun.get_parameter_types());
+            self.check_transaction_args(&fun.get_id_loc(), &fun.get_parameters());
             if fun.get_return_count() == 0 {
                 self.env
-                    .error(&fun.get_id_loc(), "view function must return values")
+                    .error(&fun.get_id_loc(), "`#[view]` function must return values")
             }
 
-            fun.get_parameter_types()
+            fun.get_parameters()
                 .iter()
-                .for_each(|parameter_type| match parameter_type {
-                    Type::Primitive(inner) => {
-                        if inner == &PrimitiveType::Signer {
-                            self.env.error(
-                                &fun.get_id_loc(),
-                                "view function cannot use the signer paremter",
-                            )
-                        }
-                    },
-                    Type::Reference(_, inner) => {
-                        if let Type::Primitive(inner) = inner.as_ref() {
+                .for_each(
+                    |Parameter(_sym, parameter_type, param_loc)| match parameter_type {
+                        Type::Primitive(inner) => {
                             if inner == &PrimitiveType::Signer {
                                 self.env.error(
-                                    &fun.get_id_loc(),
-                                    "view function cannot use the & signer paremter",
+                                    param_loc,
+                                    "`#[view]` function cannot use the `signer` parameter",
                                 )
                             }
-                        }
+                        },
+                        Type::Reference(mutability, inner) => {
+                            if let Type::Primitive(inner) = inner.as_ref() {
+                                if inner == &PrimitiveType::Signer
+                                    && mutability == &ReferenceKind::Immutable
+                                {
+                                    self.env.error(
+                                        param_loc,
+                                        "`#[view]` function cannot use the `&signer` parameter",
+                                    )
+                                }
+                            }
+                        },
+                        _ => (),
                     },
-                    _ => (),
-                });
+                );
 
             // Remember the runtime info that this is a view function
             let module_id = self.get_runtime_module_id(module);
