@@ -2,16 +2,11 @@ name: "Check banned CLI dynamic deps"
 on:
   pull_request_target:
     types: [opened, synchronize, reopened]
-  push:
-    branches:
-      - main
-  workflow_dispatch:
-
+  
 defaults:
   run:
     shell: bash
-
-
+    
 jobs:
   check-dynamic-deps:
     runs-on: ubuntu-latest
