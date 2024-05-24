@@ -6,6 +6,10 @@ on:
     branches:
       - main
   workflow_dispatch:
+defaults:
+  run:
+    shell: bash
+
 
 jobs:
   check-dynamic-deps:
