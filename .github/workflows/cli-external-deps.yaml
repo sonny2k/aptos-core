@@ -1,6 +1,6 @@
 name: "Check banned CLI dynamic deps"
 on:
-  pull_request:
+  pull_request_target:
     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
   push:
     branches:
