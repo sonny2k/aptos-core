@@ -45,7 +45,7 @@ The scope includes code within
 
 Aptos Foundation considers the following levels of severity:
 
-### Critical — Up to $1,000,000 USD in APT tokens (locked for 12 months)
+### Critical — Up to $10,000,000 USD in APT tokens (locked for 12 months)
 
 - Direct loss of funds to users or protocols with minimal preconditions, such as, Move type confusion.
 - Vulnerabilities in the Proof of Stake system which directly compromise consensus.
