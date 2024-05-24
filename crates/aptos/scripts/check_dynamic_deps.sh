@@ -26,7 +26,7 @@ for dep in "${deps[@]}"; do
     # Check for deps. As you can see, we only check for MacOS right now.
     out=`cargo tree -e features,no-build,no-dev --target aarch64-apple-darwin -p aptos -i "$dep"`
 
-    # If the exit status was non-zero, great, the dep couldn't be found.
+    # If the exit status was non-zero, great, the dep couldn't be found. ss
     if [ $? -ne 0 ]; then
         continue
     fi
